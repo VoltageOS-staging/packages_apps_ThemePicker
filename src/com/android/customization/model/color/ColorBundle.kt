@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.ImageView
+import android.widget.TextView
 import com.android.wallpaper.R
 
 class ColorBundle(
@@ -26,6 +27,7 @@ class ColorBundle(
     override fun bindThumbnailTile(view: View) {
         val resources = view.context.resources
         val thumbnailView = view.findViewById<ImageView>(R.id.color_preview_icon)
+        val themeTitleTextView: TextView? = view.findViewById<TextView>(R.id.option_tile_title)
         val secondaryColor =
             if ((resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES) mPreviewInfo.secondaryColorDark
             else mPreviewInfo.secondaryColorLight
@@ -48,6 +50,7 @@ class ColorBundle(
             }
         }
         view.contentDescription = mContentDescription
+        themeTitleTextView?.text = mTitle
     }
 
     override fun getLayoutResId(): Int {

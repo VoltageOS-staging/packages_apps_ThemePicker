@@ -86,7 +86,6 @@ class ColorProvider(context: Context, stubPackageName: String) :
             )
         )
         for (i in bundleNames.indices) {
-            if (i == 4) break
             bundlesList.add(bundleNames[i])
         }
         val colorPresetBundles = ArrayList<ColorOption>()
