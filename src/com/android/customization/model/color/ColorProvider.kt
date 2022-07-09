@@ -150,13 +150,15 @@ class ColorProvider(context: Context, stubPackageName: String) :
         } else {
             throw NoSuchElementException("List is empty.")
         }
-        val i3 = count - 1
+        val i3 = if (this.colorBundles != null) {
+            this.colorBundles.size - 1
+        }else{
+            count - 1
+        }
         var index4 = 0
         if (i3 >= 0) {
             list3 = if (i3 == 0) {
                 ArrayList()
-            } else (if (i3 >= list2.size) {
-                list2
             } else if (i3 == 1) {
                 listOf(list2[0])
             } else {
