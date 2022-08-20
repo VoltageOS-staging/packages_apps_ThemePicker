@@ -8,6 +8,7 @@ import androidx.lifecycle.LifecycleOwner;
 
 import com.android.customization.model.font.FontManager;
 import com.android.customization.model.font.FontSectionController;
+import com.android.customization.model.color.ColorSectionController;
 import com.android.customization.model.grid.GridOptionsManager;
 import com.android.customization.model.grid.GridSectionController;
 import com.android.customization.model.iconpack.IconPackManager;
@@ -45,6 +46,10 @@ public final class DefaultCustomizationSections implements CustomizationSections
                 activity, lifecycleOwner, permissionRequester, wallpaperColorsViewModel,
                 workspaceViewModel, sectionNavigationController, wallpaperPreviewNavigator,
                 savedInstanceState));
+
+        // Color section
+        sectionControllers.add(new ColorSectionController(
+                activity, wallpaperColorsViewModel, lifecycleOwner, savedInstanceState));
 
         // Dark/Light theme section.
         sectionControllers.add(new DarkModeSectionController(activity,
