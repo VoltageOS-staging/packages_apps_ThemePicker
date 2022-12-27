@@ -15,9 +15,6 @@
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
     <queries>
-        <!-- Specific intents Wallpaper picker query for -->
-        <!-- Package for theme stub -->
-        <package android:name="com.android.customization.themes" />
         <!-- Intent filter with action SET_WALLPAPER -->
         <intent>
             <action android:name="android.intent.action.SET_WALLPAPER" />
@@ -45,6 +42,8 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
+        <!-- Themes stub package -->
+        <package android:name="com.voltage.customization" />
     </queries>
 
     <uses-permission android:name="com.android.launcher3.permission.READ_SETTINGS" />
