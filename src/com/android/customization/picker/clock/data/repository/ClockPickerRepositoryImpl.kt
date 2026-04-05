@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.shareIn
 import org.json.JSONObject
 
@@ -59,45 +60,72 @@ constructor(
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
 ) : ClockPickerRepository {
 
+    private val themeOverlayPackageChanges: Flow<String?> =
+        secureSettingsRepository
+            .stringSetting(Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES)
+            .distinctUntilChanged()
+
+    private fun getAllClocks(): List<ClockMetadataModel> {
+        val activeClockId = registry.activeClockId
+        return registry.getClocks().mapNotNull {
+            val clockConfig = registry.getClockPickerConfig(it.clockId)
+            if (clockConfig != null) {
+                it.toModel(
+                    isSelected = it.clockId == activeClockId,
+                    description = clockConfig.description,
+                    thumbnail = clockConfig.thumbnail,
+                    isReactiveToTone = clockConfig.isReactiveToTone,
+                    axisPresetConfig = clockConfig.presetConfig,
+                )
+            } else {
+                null
+            }
+        }
+    }
+
+    private fun getSelectedClockModel(): ClockMetadataModel? {
+        val activeClockId = registry.activeClockId
+        val metadata = registry.settings?.metadata
+        val clockConfig = registry.getClockPickerConfig(activeClockId)
+        return clockConfig?.let {
+            registry
+                .getClocks()
+                .find { clockMetadata -> clockMetadata.clockId == activeClockId }
+                ?.toModel(
+                    isSelected = true,
+                    description = it.description,
+                    thumbnail = it.thumbnail,
+                    isReactiveToTone = it.isReactiveToTone,
+                    axisPresetConfig = it.presetConfig,
+                    selectedColorId = metadata?.getSelectedColorId(),
+                    colorTone =
+                        metadata?.getColorTone()
+                            ?: ClockMetadataModel.DEFAULT_COLOR_TONE_PROGRESS,
+                    seedColor = registry.seedColor,
+                )
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     override val allClocks: Flow<List<ClockMetadataModel>> =
-        callbackFlow {
-                fun send() {
-                    val activeClockId = registry.activeClockId
-                    val allClocks =
-                        registry.getClocks().mapNotNull {
-                            val clockConfig = registry.getClockPickerConfig(it.clockId)
-                            if (clockConfig != null) {
-                                it.toModel(
-                                    isSelected = it.clockId == activeClockId,
-                                    description = clockConfig.description,
-                                    thumbnail = clockConfig.thumbnail,
-                                    isReactiveToTone = clockConfig.isReactiveToTone,
-                                    axisPresetConfig = clockConfig.presetConfig,
-                                )
-                            } else {
-                                null
+        merge(
+                callbackFlow {
+                    val listener =
+                        object : ClockRegistry.ClockChangeListener {
+                            override fun onCurrentClockChanged() {
+                                trySend(getAllClocks())
+                            }
+
+                            override fun onAvailableClocksChanged() {
+                                trySend(getAllClocks())
                             }
                         }
-
-                    trySend(allClocks)
-                }
-
-                val listener =
-                    object : ClockRegistry.ClockChangeListener {
-                        override fun onCurrentClockChanged() {
-                            send()
-                        }
-
-                        override fun onAvailableClocksChanged() {
-                            send()
-                        }
-                    }
-                registry.registerClockChangeListener(listener)
-                send()
-                awaitClose { registry.unregisterClockChangeListener(listener) }
-            }
-            .flowOn(mainDispatcher)
+                    registry.registerClockChangeListener(listener)
+                    trySend(getAllClocks())
+                    awaitClose { registry.unregisterClockChangeListener(listener) }
+                }.flowOn(mainDispatcher),
+                themeOverlayPackageChanges.map { getAllClocks() }.flowOn(mainDispatcher),
+            )
             .mapLatest { allClocks ->
                 // Loading list of clock plugins can cause many consecutive calls of
                 // onAvailableClocksChanged(). We only care about the final fully-initiated clock
@@ -108,47 +136,24 @@ constructor(
 
     /** The currently-selected clock. This also emits the clock color information. */
     override val selectedClock: Flow<ClockMetadataModel> =
-        callbackFlow<ClockMetadataModel?> {
-                fun send() {
-                    val activeClockId = registry.activeClockId
-                    val metadata = registry.settings?.metadata
-                    val clockConfig = registry.getClockPickerConfig(activeClockId)
-                    val model =
-                        clockConfig?.let {
-                            registry
-                                .getClocks()
-                                .find { clockMetadata -> clockMetadata.clockId == activeClockId }
-                                ?.toModel(
-                                    isSelected = true,
-                                    description = it.description,
-                                    thumbnail = it.thumbnail,
-                                    isReactiveToTone = it.isReactiveToTone,
-                                    axisPresetConfig = it.presetConfig,
-                                    selectedColorId = metadata?.getSelectedColorId(),
-                                    colorTone =
-                                        metadata?.getColorTone()
-                                            ?: ClockMetadataModel.DEFAULT_COLOR_TONE_PROGRESS,
-                                    seedColor = registry.seedColor,
-                                )
-                        }
-                    trySend(model)
-                }
+        merge(
+                callbackFlow<ClockMetadataModel?> {
+                    val listener =
+                        object : ClockRegistry.ClockChangeListener {
+                            override fun onCurrentClockChanged() {
+                                trySend(getSelectedClockModel())
+                            }
 
-                val listener =
-                    object : ClockRegistry.ClockChangeListener {
-                        override fun onCurrentClockChanged() {
-                            send()
+                            override fun onAvailableClocksChanged() {
+                                trySend(getSelectedClockModel())
+                            }
                         }
-
-                        override fun onAvailableClocksChanged() {
-                            send()
-                        }
-                    }
-                registry.registerClockChangeListener(listener)
-                send()
-                awaitClose { registry.unregisterClockChangeListener(listener) }
-            }
-            .flowOn(mainDispatcher)
+                    registry.registerClockChangeListener(listener)
+                    trySend(getSelectedClockModel())
+                    awaitClose { registry.unregisterClockChangeListener(listener) }
+                }.flowOn(mainDispatcher),
+                themeOverlayPackageChanges.map { getSelectedClockModel() }.flowOn(mainDispatcher),
+            )
             .mapNotNull { it }
             // Make this a shared flow to prevent ClockRegistry.registerClockChangeListener from
             // being called every time this flow is collected, since ClockRegistry is a singleton.
@@ -257,3 +262,5 @@ constructor(
         private const val DEFAULT_CLOCK_SIZE = 1
     }
 }
+
+

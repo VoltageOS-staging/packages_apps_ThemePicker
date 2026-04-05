@@ -57,8 +57,10 @@ constructor(
     private val timeTickListeners: ConcurrentHashMap<Int, TimeTicker> = ConcurrentHashMap()
     private val clockControllers: ConcurrentHashMap<String, ClockController> = ConcurrentHashMap()
     private val smallClockFrames: HashMap<String, FrameLayout> = HashMap()
+    private var cachedClockFontFamily: String? = null
 
     override fun getController(clockId: String): ClockController? {
+        invalidateClockCacheIfNeeded()
         return clockControllers[clockId]
             ?: initClockController(clockId)?.also { clockControllers[clockId] = it }
     }
@@ -187,6 +189,26 @@ constructor(
         }
     }
 
+    private fun invalidateClockCacheIfNeeded() {
+        val resolvedClockFontFamily = getClockFontFamily()
+        if (cachedClockFontFamily == resolvedClockFontFamily) {
+            return
+        }
+
+        clockControllers.clear()
+        smallClockFrames.clear()
+        cachedClockFontFamily = resolvedClockFontFamily
+    }
+
+    private fun getClockFontFamily(): String? {
+        val clockResources = activity.resources
+        val resourceId = clockResources.getIdentifier("config_clockFontFamily", "string", "android")
+        return if (resourceId != 0) {
+            clockResources.getString(resourceId)
+        } else {
+            null
+        }
+    }
     private fun initClockController(clockId: String): ClockController? {
         try {
             val isWallpaperDark = isLockscreenWallpaperDark()
@@ -240,3 +262,8 @@ constructor(
         return Rect(getSmallClockStartPadding(), topMargin, screenSize.x, topMargin + targetHeight)
     }
 }
+
+
+
+
+
